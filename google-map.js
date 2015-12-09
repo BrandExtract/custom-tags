@@ -19,12 +19,10 @@ function camelCaseMixin() {
   </style>
 
   <script>
-    var DEFAULT_LAYER = 'Untitled';
-    
     var tag = this, GM = google.maps;
     var zoom = opts.zoom || 3;
-    var minZoom = (opts['min-zoom'] && parseInt(opts['min-zoom'])) || null;
-    var maxZoom = (opts['max-zoom'] && parseInt(opts['max-zoom'])) || null;
+    var minZoom = opts['min-zoom'];
+    var maxZoom = opts['max-zoom'];
     var center = (opts.center || '58.33,-98.52').split(',');
     var width = (opts.width || tag.root.offsetWidth || 320) + 'px';
     var height = (opts.height || tag.root.offsetHeight || 240) + 'px';
@@ -34,8 +32,8 @@ function camelCaseMixin() {
     var mapOptions = {
       center: new google.maps.LatLng(center[0], center[1]),
       zoom: parseInt(zoom),
-      minZoom: minZoom,
-      maxZoom: maxZoom,
+      minZoom: (minZoom && parseInt(minZoom)) || null,
+      maxZoom: (maxZoom && parseInt(maxZoom)) || null,
       scaleControl: opts.scale,
       scrollwheel: opts.scrollwheel,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
@@ -61,7 +59,7 @@ function camelCaseMixin() {
     }
 
     function initialize() {
-      var map = tag.map = new google.maps.Map(container, mapOptions);
+      var map = tag.map = new GM.Map(container, mapOptions);
 
       if (opts['load-geojson']) {
         map.data.loadGeoJson(opts['load-geojson']);
@@ -72,6 +70,22 @@ function camelCaseMixin() {
         map.data.addGeoJson(geoJsonData);
         this.geojson = geoJsonData;
       }
+
+      // Update so that the other tags know.
+      tag.update();
+      
+      if (opts.bounds) {
+        var latLngs = opts.bounds.split(',');
+        var bounds = new google.maps.LatLngBounds();
+        for (var i=0, count=latLngs.length; i<count; i+=2) {
+          var latLng = new google.maps.LatLng(latLngs[i+1], latLngs[i]);
+          bounds.extend(latLng);
+        }
+        
+        map.fitBounds(bounds);
+      }
+      
+      if (opts.static) return;
   
       GM.event.addListener(map.data, 'mouseover', function(dataMouseEvent) {
         var feature = dataMouseEvent.feature;
@@ -85,17 +99,14 @@ function camelCaseMixin() {
 
       GM.event.addListener(map, 'idle', function() {
         tag.update();
+        if (opts.debug) {
+          console.log('Idle at:', map.getCenter().toString());
+        }
       });
-      
-
-      // Update so that the other tags know.
-      tag.update();
     }
 
     this.on('mount', function() {
-      container.style.width = width;
-      container.style.height = height;
-      initialize();      
+      initialize();
     });
 
     this.on('update', function() {
